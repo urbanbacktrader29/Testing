@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0d16;
+  --surface: #141826;
+  --surface-2: #1c2133;
+  --surface-3: #262c42;
+  --border: #2a3049;
+  --foreground: #eef0f7;
+  --muted: #8b91ab;
+  --accent: #7c5cff;
+  --accent-2: #22d3ee;
+  --gold: #f6c453;
+  --win: #22c55e;
+  --loss: #ef4444;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-gold: var(--gold);
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --font-sans: var(--font-sans-stack);
+}
+
+html {
+  --font-sans-stack: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-stack);
+}
+
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-pop-in {
+  animation: pop-in 0.22s ease-out;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.3s ease-out;
+}
