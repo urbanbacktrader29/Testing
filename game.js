@@ -14,6 +14,12 @@ const OFFLINE_CAP_SECONDS = 8 * 3600; // max 8h of offline production simulated
 const PRESTIGE_DIVISOR = 5e7;         // tune how fast prestige points accumulate
 const PRESTIGE_BONUS_PER_POINT = 0.02; // +2% production per investor
 
+const FRENZY_DECAY_PER_SEC = 14;
+const FRENZY_PER_CLICK = 20;
+const FRENZY_PER_COLLECT_ALL = 6;
+const GOLDRUSH_DURATION = 12;    // seconds
+const GOLDRUSH_MULTIPLIER = 3;
+
 const MINES = [
   { id: 'copper',  name: 'Kupfermine',    icon: '⛏️', unlockCost: 0,             oreValue: 1,    floorBaseRate: 0.5, floorCostBase: 10,      elevatorBaseThroughput: 5,    elevatorCostBase: 100 },
   { id: 'silver',  name: 'Silbermine',    icon: '🪨', unlockCost: 75000,         oreValue: 5,    floorBaseRate: 2,   floorCostBase: 60,      elevatorBaseThroughput: 15,   elevatorCostBase: 800 },
@@ -32,7 +38,7 @@ const FLOOR_ICONS = ['⛏️', '🔨', '🧨', '🚂', '🔦', '⚒️'];
 function floorRate(mineIdx, floorIdx, level) {
   const cfg = MINES[mineIdx];
   const base = cfg.floorBaseRate * (1 + floorIdx * 0.6);
-  return base * level * prestigeMultiplier();
+  return base * level * prestigeMultiplier() * frenzyMultiplier();
 }
 
 function floorCapacity(mineIdx, floorIdx, level) {
@@ -71,6 +77,55 @@ function prestigeMultiplier() {
 
 function potentialPrestigeGain() {
   return Math.floor(Math.sqrt(Math.max(0, state.runCashEarned) / PRESTIGE_DIVISOR));
+}
+
+/* =========================================================
+   Frenzy / Goldrush (runtime-only, not saved)
+   ========================================================= */
+
+let frenzyMeter = 0;
+let goldrushActive = false;
+let goldrushEndsAt = 0;
+
+function frenzyMultiplier() {
+  return goldrushActive ? GOLDRUSH_MULTIPLIER : 1;
+}
+
+function addFrenzy(amount) {
+  frenzyMeter = Math.min(100, frenzyMeter + amount);
+  if (frenzyMeter >= 100 && !goldrushActive) {
+    frenzyMeter = 0;
+    triggerGoldrush();
+  }
+  renderFrenzy();
+}
+
+function triggerGoldrush() {
+  goldrushActive = true;
+  goldrushEndsAt = performance.now() + GOLDRUSH_DURATION * 1000;
+  document.body.classList.add('goldrush-active');
+  document.getElementById('goldrush-banner').classList.remove('hidden');
+  screenShake();
+  spawnConfetti(60);
+}
+
+function updateGoldrush(nowMs) {
+  if (!goldrushActive) return;
+  const remaining = Math.max(0, (goldrushEndsAt - nowMs) / 1000);
+  const timerEl = document.getElementById('goldrush-timer');
+  if (timerEl) timerEl.textContent = Math.ceil(remaining) + 's';
+  if (remaining <= 0) {
+    goldrushActive = false;
+    document.body.classList.remove('goldrush-active');
+    document.getElementById('goldrush-banner').classList.add('hidden');
+  }
+}
+
+function renderFrenzy() {
+  const fill = document.getElementById('frenzy-fill');
+  if (!fill) return;
+  fill.style.width = frenzyMeter + '%';
+  fill.classList.toggle('hot', frenzyMeter > 70);
 }
 
 /* =========================================================
@@ -288,13 +343,14 @@ function renderTabs() {
     } else {
       tab.innerHTML = `🔒 ${cfg.name}<span class="tab-cps">${formatCash(cfg.unlockCost)}</span>`;
       tab.disabled = state.cash < 0; // always clickable to attempt purchase
-      tab.addEventListener('click', () => tryUnlockMine(i));
+      if (state.cash >= cfg.unlockCost) tab.classList.add('ready-pulse');
+      tab.addEventListener('click', (ev) => tryUnlockMine(i, ev));
     }
     el.tabs.appendChild(tab);
   });
 }
 
-function tryUnlockMine(i) {
+function tryUnlockMine(i, ev) {
   const cfg = MINES[i];
   const mine = state.mines[i];
   if (mine.unlocked) return;
@@ -305,6 +361,8 @@ function tryUnlockMine(i) {
   state.cash -= cfg.unlockCost;
   mine.unlocked = true;
   state.activeMineIndex = i;
+  spawnConfetti(70);
+  screenShake();
   renderAll();
 }
 
@@ -328,9 +386,10 @@ function renderFloors() {
     const upgradeCost = floorUpgradeCost(mineIdx, floorIdx, floor.level);
 
     const row = document.createElement('div');
-    row.className = 'floor-row';
+    row.className = 'floor-row' + (floor.manager ? ' managed' : '');
 
-    const barClass = floor.manager ? 'floor-bar managed' : 'floor-bar';
+    const isWarn = !floor.manager && fillPct >= 85;
+    const barClass = 'floor-bar' + (floor.manager ? ' managed' : '') + (isWarn ? ' warn' : '');
 
     row.innerHTML = `
       <div class="floor-icon">${FLOOR_ICONS[floorIdx % FLOOR_ICONS.length]}</div>
@@ -358,6 +417,7 @@ function renderFloors() {
     const fi = parseInt(btn.getAttribute('data-upgrade'), 10);
     const cost = floorUpgradeCost(mineIdx, fi, mine.floors[fi].level);
     btn.disabled = state.cash < cost;
+    if (!btn.disabled) btn.classList.add('ready-pulse');
     btn.addEventListener('click', (ev) => upgradeFloor(mineIdx, fi, ev));
   });
   // manager buttons
@@ -365,6 +425,7 @@ function renderFloors() {
     const fi = parseInt(btn.getAttribute('data-manager'), 10);
     const cost = floorManagerCost(mineIdx, fi);
     btn.disabled = state.cash < cost;
+    if (!btn.disabled) btn.classList.add('ready-pulse');
     btn.addEventListener('click', (ev) => buyManager(mineIdx, fi, ev));
   });
   // collect bars
@@ -379,11 +440,12 @@ function renderFloors() {
     const cost = floorUnlockCost(mineIdx, nextLockedIndex);
     const row = document.createElement('div');
     row.className = 'floor-locked';
+    const affordable = state.cash >= cost;
     row.innerHTML = `
       <span>🔒 Neuer Schacht ${nextLockedIndex + 1} freischalten</span>
-      <button class="btn btn-primary btn-small" ${state.cash < cost ? 'disabled' : ''}>${formatCash(cost)}</button>
+      <button class="btn btn-primary btn-small${affordable ? ' ready-pulse' : ''}" ${affordable ? '' : 'disabled'}>${formatCash(cost)}</button>
     `;
-    row.querySelector('button').addEventListener('click', () => unlockFloor(mineIdx, nextLockedIndex));
+    row.querySelector('button').addEventListener('click', (ev) => unlockFloor(mineIdx, nextLockedIndex, ev));
     el.unlockFloorRow.appendChild(row);
   }
 }
@@ -401,7 +463,8 @@ function renderElevator() {
   const upgradeCost = elevatorUpgradeCost(mineIdx, mine.elevatorLevel);
   el.elevatorUpgradeBtn.textContent = `⬆️ Aufzug Lv.${mine.elevatorLevel} → ${mine.elevatorLevel + 1} (${formatCash(upgradeCost)})`;
   el.elevatorUpgradeBtn.disabled = state.cash < upgradeCost;
-  el.elevatorUpgradeBtn.onclick = () => upgradeElevator(mineIdx);
+  el.elevatorUpgradeBtn.classList.toggle('ready-pulse', !el.elevatorUpgradeBtn.disabled);
+  el.elevatorUpgradeBtn.onclick = (ev) => upgradeElevator(mineIdx, ev);
 
   el.mineCps.textContent = formatCash(mineCashPerSecond(mineIdx)) + '/s';
 }
@@ -424,6 +487,9 @@ function upgradeFloor(mineIdx, floorIdx, ev) {
   if (state.cash < cost) { shake(ev.currentTarget); return; }
   state.cash -= cost;
   floor.level++;
+  addRipple(ev.currentTarget, ev);
+  spawnOreParticles(ev.clientX, ev.clientY, 5);
+  if (floor.level % 10 === 0) { spawnConfetti(24); screenShake(); }
   renderAll();
 }
 
@@ -435,24 +501,34 @@ function buyManager(mineIdx, floorIdx, ev) {
   if (state.cash < cost) { shake(ev.currentTarget); return; }
   state.cash -= cost;
   floor.manager = true;
+  addRipple(ev.currentTarget, ev);
+  spawnConfetti(20);
   renderAll();
 }
 
-function unlockFloor(mineIdx, floorIdx) {
+function unlockFloor(mineIdx, floorIdx, ev) {
   const mine = state.mines[mineIdx];
   const cost = floorUnlockCost(mineIdx, floorIdx);
   if (state.cash < cost) return;
   state.cash -= cost;
   mine.floors[floorIdx].unlocked = true;
+  if (ev) addRipple(ev.currentTarget, ev);
+  spawnConfetti(26);
+  screenShake();
   renderAll();
 }
 
-function upgradeElevator(mineIdx) {
+function upgradeElevator(mineIdx, ev) {
   const mine = state.mines[mineIdx];
   const cost = elevatorUpgradeCost(mineIdx, mine.elevatorLevel);
   if (state.cash < cost) return;
   state.cash -= cost;
   mine.elevatorLevel++;
+  if (ev) {
+    addRipple(el.elevatorUpgradeBtn, ev);
+    spawnOreParticles(ev.clientX, ev.clientY, 8);
+  }
+  if (mine.elevatorLevel % 5 === 0) { spawnConfetti(24); screenShake(); }
   renderAll();
 }
 
@@ -461,16 +537,17 @@ function collectFloor(mineIdx, floorIdx, ev) {
   const floor = mine.floors[floorIdx];
   if (floor.manager) return; // managed floors auto-collect
   if (floor.buffer <= 0) return;
-  const oreValue = MINES[mineIdx].oreValue;
-  const throughput = elevatorThroughput(mineIdx, mine.elevatorLevel);
   // instantly hand off to elevator queue (elevator throughput still gates conversion to cash over time)
   mine.elevatorQueue += floor.buffer;
   spawnFloatText(ev.clientX, ev.clientY, `+${formatNumber(floor.buffer)} Erz`);
+  spawnOreParticles(ev.clientX, ev.clientY, 6 + Math.floor(Math.random() * 4));
+  popCash();
+  addFrenzy(FRENZY_PER_CLICK);
   floor.buffer = 0;
   renderAll();
 }
 
-function collectAll() {
+function collectAll(ev) {
   const mineIdx = state.activeMineIndex;
   const mine = state.mines[mineIdx];
   let any = false;
@@ -481,7 +558,15 @@ function collectAll() {
       any = true;
     }
   });
-  if (any) renderAll();
+  if (any) {
+    if (ev) {
+      addRipple(el.collectAllBtn, ev);
+      spawnOreParticles(ev.clientX, ev.clientY, 10);
+    }
+    popCash();
+    addFrenzy(FRENZY_PER_COLLECT_ALL);
+    renderAll();
+  }
 }
 
 /* =========================================================
@@ -508,7 +593,12 @@ function doPrestige() {
   state = freshState();
   state.lifetimeCashEarned = lifetime;
   state.prestigePoints += gain; // note: freshState sets 0, so this equals gain, kept explicit for clarity
+  frenzyMeter = 0;
+  goldrushActive = false;
+  document.body.classList.remove('goldrush-active');
+  document.getElementById('goldrush-banner').classList.add('hidden');
   closePrestigeModal();
+  prestigeCelebration();
   renderAll();
   save();
 }
@@ -535,6 +625,94 @@ function spawnFloatText(x, y, text) {
   node.textContent = text;
   el.floatLayer.appendChild(node);
   setTimeout(() => node.remove(), 900);
+}
+
+const ORE_EMOJIS = ['🪙', '⛏️', '✨', '💰'];
+
+function spawnOreParticles(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle particle-ore';
+    p.textContent = ORE_EMOJIS[Math.floor(Math.random() * ORE_EMOJIS.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 80;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 50;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.setProperty('--dx', dx + 'px');
+    p.style.setProperty('--dy', dy + 'px');
+    p.style.setProperty('--rot', (Math.random() * 360 - 180) + 'deg');
+    el.floatLayer.appendChild(p);
+    setTimeout(() => p.remove(), 850);
+  }
+}
+
+const CONFETTI_COLORS = ['#f4c04d', '#e0645a', '#5aa9e0', '#6fcf6f', '#c9962f'];
+
+function spawnConfetti(count) {
+  for (let i = 0; i < count; i++) {
+    const c = document.createElement('div');
+    c.className = 'particle particle-confetti';
+    c.style.left = (Math.random() * 100) + 'vw';
+    c.style.top = '-20px';
+    c.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    c.style.setProperty('--dx', (Math.random() * 240 - 120) + 'px');
+    c.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+    c.style.animationDelay = (Math.random() * 0.3) + 's';
+    el.floatLayer.appendChild(c);
+    setTimeout(() => c.remove(), 2000);
+  }
+}
+
+function screenShake() {
+  document.body.classList.remove('screen-shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+}
+
+function addRipple(btn, ev) {
+  if (!btn || !ev) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  const span = document.createElement('span');
+  span.className = 'ripple';
+  span.style.width = span.style.height = size + 'px';
+  span.style.left = (ev.clientX - rect.left - size / 2) + 'px';
+  span.style.top = (ev.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(span);
+  setTimeout(() => span.remove(), 500);
+}
+
+function popCash() {
+  el.cash.classList.remove('pop');
+  void el.cash.offsetWidth;
+  el.cash.classList.add('pop');
+}
+
+function prestigeCelebration() {
+  const overlay = document.createElement('div');
+  overlay.className = 'prestige-flash-overlay';
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 1200);
+  spawnConfetti(90);
+  screenShake();
+}
+
+let lastElevatorParticle = 0;
+function maybeSpawnElevatorParticle(nowMs) {
+  const mine = state.mines[state.activeMineIndex];
+  if (!mine || mine.elevatorQueue <= 0) return;
+  if (nowMs - lastElevatorParticle < 350) return;
+  lastElevatorParticle = nowMs;
+  const shaft = document.querySelector('.elevator-shaft');
+  if (!shaft) return;
+  const dot = document.createElement('div');
+  dot.className = 'ore-rise';
+  dot.style.left = (42 + Math.random() * 16) + '%';
+  shaft.appendChild(dot);
+  setTimeout(() => dot.remove(), 1150);
 }
 
 let saveFlashTimeout = null;
@@ -589,6 +767,12 @@ function init() {
     const dt = (now - lastTick) / 1000;
     lastTick = now;
     tick(dt);
+    updateGoldrush(now);
+    if (frenzyMeter > 0) {
+      frenzyMeter = Math.max(0, frenzyMeter - FRENZY_DECAY_PER_SEC * dt);
+      renderFrenzy();
+    }
+    maybeSpawnElevatorParticle(now);
     renderTopbar();
     renderElevator();
     // lightweight refresh of floor bars without full re-render for perf
@@ -617,6 +801,8 @@ function updateFloorBarsOnly() {
     const fillPct = capacity > 0 ? Math.min(100, (floor.buffer / capacity) * 100) : 0;
     const fillEl = row.querySelector('.floor-bar-fill');
     if (fillEl) fillEl.style.width = fillPct + '%';
+    const barEl = row.querySelector('.floor-bar');
+    if (barEl) barEl.classList.toggle('warn', !floor.manager && fillPct >= 85);
   });
 }
 
