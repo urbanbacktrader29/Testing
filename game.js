@@ -554,10 +554,14 @@ function renderFloors() {
     const barClass = 'floor-bar' + (floor.manager ? ' managed' : '') + (isWarn ? ' warn' : '');
     const sceneClass = 'floor-scene' + (floor.manager ? ' managed' : '') + (isWarn ? ' warn' : '') + (isIdle ? ' idle' : '');
     const spriteId = floor.manager ? 'sprite-robot' : 'sprite-miner';
+    const spriteWrapClass = floor.manager ? 'sprite-wrap sprite-robot-wrap' : 'sprite-wrap sprite-miner-wrap';
+    const animDelay = -(floorIdx * 1.1).toFixed(2) + 's';
 
     row.innerHTML = `
-      <div class="${sceneClass}" data-collect="${floorIdx}" title="Klicken zum Einsammeln">
-        <div class="sprite-wrap"><svg class="sprite"><use href="#${spriteId}"/></svg></div>
+      <div class="${sceneClass}" data-collect="${floorIdx}" title="Klicken zum Einsammeln" style="--anim-delay:${animDelay}">
+        <div class="${spriteWrapClass}">
+          <svg class="sprite"><use href="#${spriteId}"/></svg>
+        </div>
         <div class="ore-cart">
           <div class="ore-cart-body"><div class="ore-cart-fill" style="height:${fillPct}%"></div></div>
           <div class="ore-cart-wheel l"></div>
