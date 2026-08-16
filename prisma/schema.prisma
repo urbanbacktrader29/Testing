@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support, so these are plain strings.
+// Valid values are enforced at the application layer:
+// SubscriptionStatus: NONE | ACTIVE | PAST_DUE | CANCELED
+// PaymentProvider:    STRIPE | CRYPTO
+// SignalDirection:    BUY | SELL
+
+model User {
+  id                   String    @id @default(cuid())
+  name                 String?
+  email                String    @unique
+  passwordHash         String
+  createdAt            DateTime  @default(now())
+
+  subscriptionStatus   String    @default("NONE")
+  subscriptionProvider String?
+  subscriptionExpires  DateTime?
+
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+
+  payments             Payment[]
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  provider   String
+  amountUsd  Float
+  status     String
+  externalId String?  @unique
+  createdAt  DateTime @default(now())
+}
+
+model Signal {
+  id         String   @id @default(cuid())
+  symbol     String
+  direction  String
+  entry      Float
+  stopLoss   Float
+  takeProfit Float
+  confidence Int
+  timeframe  String
+  note       String
+  createdAt  DateTime @default(now())
+}

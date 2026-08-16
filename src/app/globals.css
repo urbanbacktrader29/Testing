@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-base-950 text-slate-100 antialiased;
+}
+
+::selection {
+  @apply bg-accent-500/40 text-white;
+}
+
+.glass-card {
+  @apply rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm;
+}
+
+.section-heading {
+  @apply text-3xl sm:text-4xl font-bold tracking-tight text-white;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-accent-400 via-emerald-300 to-gold-400 bg-clip-text text-transparent;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-lg bg-accent-500 px-6 py-3 font-semibold text-base-950 shadow-lg shadow-accent-500/20 transition hover:bg-accent-400 active:scale-[0.98];
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/5 px-6 py-3 font-semibold text-white transition hover:bg-white/10 active:scale-[0.98];
+}
