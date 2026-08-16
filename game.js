@@ -43,8 +43,6 @@ const MINES = [
   { id: 'asteroid',name: 'Asteroidengürtel',icon: '☄️', unlockCost: 5e16,          oreValue: 375000, floorBaseRate: 17800, floorCostBase: 5.15e7, elevatorBaseThroughput: 71900, elevatorCostBase: 6.86e8, theme: ['#3a2e5c', '#8a7fd0'] },
 ];
 
-const FLOOR_ICONS = ['⛏️', '🔨', '🧨', '🚂', '🔦', '⚒️'];
-
 /* =========================================================
    Skills (Talente) — permanent, bought with skill points earned via prestige
    ========================================================= */
@@ -552,10 +550,20 @@ function renderFloors() {
     row.className = 'floor-row' + (floor.manager ? ' managed' : '') + (eventOn ? ' event-active' : '');
 
     const isWarn = !floor.manager && fillPct >= 85;
+    const isIdle = !floor.manager && fillPct >= 99;
     const barClass = 'floor-bar' + (floor.manager ? ' managed' : '') + (isWarn ? ' warn' : '');
+    const sceneClass = 'floor-scene' + (floor.manager ? ' managed' : '') + (isWarn ? ' warn' : '') + (isIdle ? ' idle' : '');
+    const spriteId = floor.manager ? 'sprite-robot' : 'sprite-miner';
 
     row.innerHTML = `
-      <div class="floor-icon">${FLOOR_ICONS[floorIdx % FLOOR_ICONS.length]}</div>
+      <div class="${sceneClass}" data-collect="${floorIdx}" title="Klicken zum Einsammeln">
+        <div class="sprite-wrap"><svg class="sprite"><use href="#${spriteId}"/></svg></div>
+        <div class="ore-cart">
+          <div class="ore-cart-body"><div class="ore-cart-fill" style="height:${fillPct}%"></div></div>
+          <div class="ore-cart-wheel l"></div>
+          <div class="ore-cart-wheel r"></div>
+        </div>
+      </div>
       <div class="floor-main">
         <div class="floor-name-row">
           <b>Schacht ${floorIdx + 1} · Lv.${floor.level}</b>
@@ -1872,7 +1880,17 @@ function updateFloorBarsOnly() {
     const fillEl = row.querySelector('.floor-bar-fill');
     if (fillEl) fillEl.style.width = fillPct + '%';
     const barEl = row.querySelector('.floor-bar');
-    if (barEl) barEl.classList.toggle('warn', !floor.manager && fillPct >= 85);
+    const isWarn = !floor.manager && fillPct >= 85;
+    if (barEl) barEl.classList.toggle('warn', isWarn);
+
+    const cartFillEl = row.querySelector('.ore-cart-fill');
+    if (cartFillEl) cartFillEl.style.height = fillPct + '%';
+    const sceneEl = row.querySelector('.floor-scene');
+    if (sceneEl) {
+      sceneEl.classList.toggle('warn', isWarn);
+      sceneEl.classList.toggle('idle', !floor.manager && fillPct >= 99);
+    }
+
     const eventOn = floorEventMultiplier(mineIdx, floorIdx) > 1;
     row.classList.toggle('event-active', eventOn);
   });
