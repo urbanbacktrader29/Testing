@@ -1878,4 +1878,27 @@ function updateFloorBarsOnly() {
   });
 }
 
+/* =========================================================
+   Mobile lockdown: no copy, no pinch-zoom, no double-tap zoom
+   (belt-and-braces for browsers that don't fully honor the
+   viewport meta tag or the CSS touch-action/user-select rules)
+   ========================================================= */
+
+function lockDownMobileGestures() {
+  document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('.score-code-input')) e.preventDefault();
+  });
+  document.addEventListener('copy', (e) => {
+    if (!e.target.closest('.score-code-input')) e.preventDefault();
+  });
+  // Pinch-zoom (Safari gesture events only — does not fire on normal taps/clicks,
+  // so this can't interfere with fast repeated tapping on floors for the Frenzy meter).
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('gesturechange', (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+}
+
+lockDownMobileGestures();
 init();
