@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Idle Mining Tycoon</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛏️</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="offline-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>⛏️ Willkommen zurück!</h2>
+    <p id="offline-text">Während du weg warst, haben deine Manager weitergearbeitet.</p>
+    <div class="offline-earnings" id="offline-earnings">+$0</div>
+    <button id="offline-close-btn" class="btn btn-primary">Einsammeln</button>
+  </div>
+</div>
+
+<div id="prestige-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>💼 Firma verkaufen</h2>
+    <p>Verkaufe dein Bergbau-Imperium an neue Investoren und starte mit einem dauerhaften Produktionsbonus neu.</p>
+    <p>Du erhältst: <span id="prestige-gain" class="highlight">0</span> Investoren</p>
+    <p>Neuer Gesamtbonus: <span id="prestige-new-mult" class="highlight">+0%</span> Produktion</p>
+    <div class="modal-actions">
+      <button id="prestige-cancel-btn" class="btn">Abbrechen</button>
+      <button id="prestige-confirm-btn" class="btn btn-danger">Verkaufen & Neustarten</button>
+    </div>
+  </div>
+</div>
+
+<header id="topbar">
+  <div class="brand">⛏️ <span>Idle Mining Tycoon</span></div>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">Kasse</span>
+      <span class="stat-value" id="cash-display">$0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Einnahmen/Sek</span>
+      <span class="stat-value" id="cps-display">$0/s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Investoren</span>
+      <span class="stat-value" id="prestige-display">0 (+0%)</span>
+    </div>
+  </div>
+  <button id="prestige-open-btn" class="btn btn-gold">💼 Prestige</button>
+</header>
+
+<nav id="mine-tabs"></nav>
+
+<main id="mine-view">
+  <section id="floors-panel">
+    <div class="panel-header">
+      <h2 id="mine-title">Mine</h2>
+      <button id="collect-all-btn" class="btn btn-small">🖐️ Alles einsammeln</button>
+    </div>
+    <div id="floors-list"></div>
+    <div id="unlock-floor-row"></div>
+  </section>
+
+  <aside id="elevator-panel">
+    <h3>🛗 Aufzug</h3>
+    <div class="elevator-shaft">
+      <div class="elevator-fill" id="elevator-fill"></div>
+    </div>
+    <div class="elevator-info">
+      <div>Durchsatz: <span id="elevator-throughput">0</span> Erz/s</div>
+      <div>Warteschlange: <span id="elevator-queue">0</span></div>
+    </div>
+    <button id="elevator-upgrade-btn" class="btn btn-primary">Aufzug upgraden</button>
+    <div class="mine-total">
+      <div>Mine Gesamteinnahmen/s</div>
+      <div id="mine-cps" class="highlight">$0/s</div>
+    </div>
+  </aside>
+</main>
+
+<footer id="footer">
+  <span id="save-indicator">Gespeichert</span>
+  <button id="reset-btn" class="btn btn-small btn-danger-outline">Spielstand löschen</button>
+</footer>
+
+<div id="float-layer"></div>
+
+<script src="game.js"></script>
+</body>
+</html>
